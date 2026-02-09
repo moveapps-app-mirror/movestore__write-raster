@@ -2,6 +2,9 @@ library(move2)
 library(sf)
 library(stars)
 library(terra)
+library(zip)
+library(ncdf4)
+
 
 ###Helper: Rasterize a single track
 rasterize_track <- function(track_sf, time_col, crs_proj, raster_grid) {
@@ -59,7 +62,7 @@ rFunction <-  function(data, grid, raster_type = c("raster", "ascii", "CDF", "GT
   
   
   #blank map grid
-  bounds <- st_bbox(sf_data_proj) # bounding box
+  bounds <- st_bbox(sf_data_proj) 
   raster_grid <- st_as_stars( bounds, dx = grid, dy = grid, values = 0 ) 
   
   #Rasterize all tracks
@@ -78,8 +81,26 @@ rFunction <-  function(data, grid, raster_type = c("raster", "ascii", "CDF", "GT
   spat_raster <- terra::rast(sum_raster)
   spat_raster[spat_raster == 0] <- NA
   
-  if (raster_type=="raster") terra::writeRaster(spat_raster ,filename=appArtifactPath("data_raster.grd"), overwrite = TRUE) 
-  if (raster_type=="ascii") terra::writeRaster(spat_raster ,filename=appArtifactPath("data_raster.asc"), overwrite = TRUE) 
+  
+  if (raster_type == "raster") {
+    raster_file <- tempdir()
+    out_path <- file.path(raster_file, "data_raster.grd")
+    terra::writeRaster(spat_raster, filename = out_path, overwrite = TRUE)
+    files_to_zip <- list.files(raster_file, pattern = "^data_raster", full.names = TRUE)
+    zip_file <- appArtifactPath("data_raster_raster.zip")
+    zip::zip(zip_file, files = files_to_zip, mode = "cherry-pick")
+  }
+  
+  if (raster_type == "ascii") {
+    ascii_file <- tempdir()
+    out_path <- file.path(ascii_file, "data_raster.asc")
+    terra::writeRaster(spat_raster, filename = out_path, overwrite = TRUE)
+    files_to_zip <- list.files(ascii_file, pattern = "^data_raster", full.names = TRUE)
+    zip_file <- appArtifactPath("data_raster_ascii.zip")
+    zip::zip(zip_file, files = files_to_zip, mode = "cherry-pick")
+  }
+  
+  
   if (raster_type=="GTiff") terra::writeRaster(spat_raster ,filename=appArtifactPath("data_raster.tif"), overwrite = TRUE) 
   if (raster_type=="CDF") terra::writeCDF(spat_raster ,filename=appArtifactPath("data_raster.nc"), overwrite = TRUE) 
   
@@ -87,14 +108,4 @@ rFunction <-  function(data, grid, raster_type = c("raster", "ascii", "CDF", "GT
   
   return(input_data)
 }
-  
-  
-  
-  
-# #run locally  
-# res <- rast("./data/output/data_raster.grd")
-# res
-# plot(res)
-  
-  
   
